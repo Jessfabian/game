@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Quiet Archive — Cozy Library Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --wood-dark: #2a1810;
+            --wood-mid: #432818;
+            --wood-light: #6f4518;
+            --wood-shelf: #3b2214;
+            --brass-light: #f3d58d;
+            --brass-mid: #c59b27;
+            --parchment: #f9f3e3;
+            --parchment-dark: #ede1c5;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            transition: background 0.9s ease;
+        }
+
+        .font-serif-display {
+            font-family: 'Cinzel', serif;
+        }
+
+        .font-serif-book {
+            font-family: 'Crimson Pro', serif;
+        }
+
+        /* Ambient Time-of-Day Themes */
+        .theme-morning {
+            background: radial-gradient(circle at 20% 20%, #fef9ef 0%, #e7d8c1 45%, #b89f80 100%);
+            color: #2b1d12;
+        }
+        .theme-golden {
+            background: radial-gradient(circle at 25% 25%, #fde2b8 0%, #d48c57 48%, #6d3b24 100%);
+            color: #2b1810;
+        }
+        .theme-rain {
+            background: radial-gradient(circle at 30% 20%, #334155 0%, #1e293b 55%, #0f172a 100%);
+            color: #f1f5f9;
+        }
+        .theme-midnight {
+            background: radial-gradient(circle at 50% 30%, #2c1e16 0%, #16100e 60%, #090606 100%);
+            color: #f8ebd7;
+        }
+
+        /* Oak & Walnut Bookcase Textures */
+        .bookcase-frame {
+            background: linear-gradient(180deg, #3a2214 0%, #2b180e 50%, #211109 100%);
+            box-shadow: 
+                inset 0 2px 6px rgba(255, 225, 180, 0.15),
+                0 20px 45px rgba(0, 0, 0, 0.45),
+                0 0 0 6px #4e2f1d,
+                0 0 0 8px #1e1008;
+        }
+
+        .shelf-recess {
+            background: linear-gradient(180deg, #160c06 0%, #24140b 75%, #2f1b10 100%);
+            box-shadow: inset 0 12px 24px rgba(0, 0, 0, 0.72), inset 0 -2px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .shelf-plank {
+            background: linear-gradient(90deg, #4a2c18 0%, #633b22 25%, #52301b 50%, #683e24 75%, #4a2c18 100%);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 225, 185, 0.25);
+        }
+
+        .brass-plaque {
+            background: linear-gradient(135deg, #f3d68b 0%, #c69a35 50%, #99711b 100%);
+            color: #231508;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.45), inset 0 1px 1px rgba(255,255,255,0.65);
+        }
+
+        /* Book Spine Styling */
+        .book-spine {
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease, filter 0.2s ease;
+            transform-origin: bottom center;
+            box-shadow: 
+                inset 3px 0 5px rgba(255, 255, 255, 0.22),
+                inset -3px 0 6px rgba(0, 0, 0, 0.42),
+                2px 0 5px rgba(0, 0, 0, 0.35);
+            border-radius: 3px 3px 1px 1px;
+            flex-shrink: 0;
+        }
+
+        .book-spine:hover {
+            transform: translateY(-10px) scale(1.03);
+            z-index: 20;
+            box-shadow: 
+                inset 3px 0 6px rgba(255, 255, 255, 0.35),
+                inset -3px 0 6px rgba(0, 0, 0, 0.42),
+                0 12px 18px rgba(0, 0, 0, 0.45);
+        }
+
+        .book-spine.selected-book {
+            transform: translateY(-16px) scale(1.06);
+            z-index: 30;
+            outline: 2.5px solid #fbbf24;
+            box-shadow: 0 0 18px rgba(251, 191, 36, 0.75), 0 14px 20px rgba(0,0,0,0.5);
+        }
+
+        /* Vertical spine title writing */
+        .vertical-title {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+        }
+
+        /* Dust & Wear Visual Overlays */
+        .dust-overlay {
+            background-image: radial-gradient(rgba(214, 204, 194, 0.65) 1px, transparent 0);
+            background-size: 5px 5px;
+            background-color: rgba(168, 162, 158, 0.38);
+        }
+
+        /* Floating Sunbeam Dust Motes */
+        @keyframes floatMote {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.25; }
+            50% { transform: translate(14px, -22px) scale(1.25); opacity: 0.75; }
+        }
+        .mote {
+            animation: floatMote 7s ease-in-out infinite;
+        }
+
+        /* Rain Streak Animation */
+        @keyframes rainFall {
+            0% { transform: translateY(-20px) translateX(5px); opacity: 0; }
+            30% { opacity: 0.55; }
+            100% { transform: translateY(240px) translateX(-15px); opacity: 0; }
+        }
+        .rain-drop {
+            animation: rainFall 1.3s linear infinite;
+        }
+
+        /* Cat Purr & Tail Sway */
+        @keyframes tailWag {
+            0%, 100% { transform: rotate(-6deg); }
+            50% { transform: rotate(8deg); }
+        }
+        .cat-tail {
+            transform-origin: 18px 22px;
+            animation: tailWag 3.2s ease-in-out infinite;
+        }
+
+        /* Coffee Steam */
+        @keyframes steamRise {
+            0% { transform: translateY(0) scaleX(1); opacity: 0.7; }
+            100% { transform: translateY(-14px) scaleX(1.3); opacity: 0; }
+        }
+        .steam-wisp {
+            animation: steamRise 2.4s ease-out infinite;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.08);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(180, 140, 90, 0.45);
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="theme-morning h-screen w-screen flex flex-col overflow-hidden" id="app-body">
+
+    <!-- Ambient Sunbeam & Dust Motes Background Layer -->
+    <div class="fixed inset-0 pointer-events-none overflow-hidden z-0" id="ambient-bg-layer">
+        <!-- Diagonal Sunbeam -->
+        <div id="sunbeam-ray" class="absolute -top-20 -left-20 w-[550px] h-[900px] bg-gradient-to-br from-amber-100/30 via-amber-200/10 to-transparent rotate-[-28deg] blur-2xl transition-opacity duration-1000"></div>
+        <!-- Floating Dust Motes Container -->
+        <div id="motes-container"></div>
+    </div>
+
+    <!-- TOP HEADER: Library Identity, Stats, Sorting Mode & Ambient Controls -->
+    <header class="h-16 px-4 lg:px-6 flex items-center justify-between z-30 bg-[#23140d]/95 text-amber-50 border-b-2 border-[#5c3820] shadow-lg shrink-0">
+        <!-- Brand Logo & Day Counter -->
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl brass-plaque flex items-center justify-center shadow-md font-serif-display font-bold text-lg">
+                📖
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-serif-display font-bold text-base sm:text-lg tracking-wider text-amber-100 leading-none">THE QUIET ARCHIVE</h1>
+                    <span id="day-badge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-900/80 text-amber-200 border border-amber-600/40">Day 1 • Morning</span>
+                </div>
+                <p class="text-[11px] text-amber-300/75 font-serif-book italic mt-0.5" id="librarian-rank-label">Apprentice Curator of Rare Volumes</p>
+            </div>
+        </div>
+
+        <!-- Center Harmony & Currencies -->
+        <div class="hidden md:flex items-center gap-3 bg-[#160c07]/90 px-4 py-1.5 rounded-full border border-amber-700/40 shadow-inner">
+            <!-- Shelf Harmony Score -->
+            <div class="flex items-center gap-2" title="Organize shelves by the active Sorting Rule to raise Archive Harmony!">
+                <span class="text-xs text-amber-300/80">✨ Harmony:</span>
+                <div class="w-24 h-2.5 bg-stone-800 rounded-full overflow-hidden border border-amber-800/60">
+                    <div id="harmony-bar" class="h-full bg-gradient-to-r from-amber-500 to-emerald-400 transition-all duration-500" style="width: 65%"></div>
+                </div>
+                <span id="harmony-score-text" class="text-xs font-mono font-bold text-emerald-400">65%</span>
+            </div>
+
+            <div class="h-4 w-[1px] bg-amber-800/50"></div>
+
+            <!-- Library Tokens -->
+            <div class="flex items-center gap-1.5 text-xs">
+                <span title="Library Tokens">🪙</span>
+                <span id="tokens-count" class="font-bold font-mono text-amber-300">45</span>
+                <span class="text-[11px] text-amber-200/60">Tokens</span>
+            </div>
+
+            <div class="h-4 w-[1px] bg-amber-800/50"></div>
+
+            <!-- Reputation Stars -->
+            <div class="flex items-center gap-1.5 text-xs">
+                <span>⭐</span>
+                <span id="rep-count" class="font-bold font-mono text-amber-200">12</span>
+                <span class="text-[11px] text-amber-200/60">Renown</span>
+            </div>
+        </div>
+
+        <!-- Right Controls: Sorting Mode, Shop, Time of Day, Audio -->
+        <div class="flex items-center gap-2">
+            <!-- Sorting Rule Selector -->
+            <div class="flex items-center bg-[#331d12] rounded-xl p-1 border border-amber-700/40 text-xs">
+                <span class="hidden xl:inline text-[11px] text-amber-200/70 px-2">Sort Rule:</span>
+                <button data-sort="genre" class="sort-mode-btn px-2.5 py-1 rounded-lg font-semibold bg-amber-600 text-stone-950 transition">Genre #</button>
+                <button data-sort="color" class="sort-mode-btn px-2.5 py-1 rounded-lg font-semibold text-amber-200/80 hover:text-white transition">Rainbow</button>
+                <button data-sort="height" class="sort-mode-btn px-2.5 py-1 rounded-lg font-semibold text-amber-200/80 hover:text-white transition">Height</button>
+            </div>
+
+            <!-- Sanctuary Decor Shop Button -->
+            <button id="btn-open-shop" class="px-3 py-1.5 rounded-xl text-xs font-semibold brass-plaque hover:brightness-110 transition flex items-center gap-1.5 active:scale-95">
+                <span>🐈‍⬛</span>
+                <span class="hidden sm:inline">Sanctuary Shop</span>
+            </button>
+
+            <!-- Time / Atmosphere Cycle Button -->
+            <button id="btn-cycle-time" title="Cycle Time of Day & Weather" class="p-2 rounded-xl bg-[#331d12] hover:bg-[#462819] text-amber-200 border border-amber-700/40 transition">
+                <span id="time-icon">☀️</span>
+            </button>
+
+            <!-- Sound / Ambience Toggle -->
+            <button id="btn-audio-toggle" title="Toggle Cozy Sound Effects & Rain" class="p-2 rounded-xl bg-[#331d12] hover:bg-[#462819] text-amber-200 border border-amber-700/40 transition">
+                <span id="audio-icon">🔊</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <main class="flex-1 flex flex-col lg:flex-row gap-3 p-3 lg:p-4 overflow-hidden z-10">
+
+        <!-- LEFT COLUMN: Arched Window, Patron Requests & Librarian Desk -->
+        <aside class="w-full lg:w-80 xl:w-88 flex flex-col gap-3 shrink-0 order-2 lg:order-1 overflow-y-auto">
+            
+            <!-- Arched Library Window & Weather Card -->
+            <div class="relative h-36 rounded-t-[70px] rounded-b-2xl overflow-hidden border-4 border-[#3a2214] shadow-xl shrink-0 bg-gradient-to-b from-sky-200 via-amber-100 to-emerald-900/40" id="window-viewport">
+                <!-- Dynamic Sky SVG inside window -->
+                <svg viewBox="0 0 320 150" class="w-full h-full object-cover" id="window-svg">
+                    <defs>
+                        <linearGradient id="sky-morning" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#bae6fd"/>
+                            <stop offset="100%" stop-color="#fef3c7"/>
+                        </linearGradient>
+                        <linearGradient id="sky-golden" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#7c2d12"/>
+                            <stop offset="50%" stop-color="#ea580c"/>
+                            <stop offset="100%" stop-color="#fde047"/>
+                        </linearGradient>
+                        <linearGradient id="sky-rain" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#1e293b"/>
+                            <stop offset="100%" stop-color="#475569"/>
+                        </linearGradient>
+                        <linearGradient id="sky-midnight" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#090d16"/>
+                            <stop offset="100%" stop-color="#1e1b4b"/>
+                        </linearGradient>
+                    </defs>
+                    <rect id="window-sky-rect" width="320" height="150" fill="url(#sky-morning)"/>
+                    <!-- Sun / Moon -->
+                    <circle id="window-celestial" cx="240" cy="45" r="22" fill="#fde047" opacity="0.9"/>
+                    <!-- Distant Hills & Cypress Trees -->
+                    <path d="M0,150 L0,105 Q80,80 170,110 T320,95 L320,150 Z" fill="#1e3a2f" opacity="0.75"/>
+                    <path d="M0,150 L0,120 Q120,100 220,125 T320,115 L320,150 Z" fill="#13261f" opacity="0.9"/>
+                    <!-- Rain Overlay inside Window -->
+                    <g id="window-rain-layer" class="hidden" stroke="#cbd5e1" stroke-width="1.2" opacity="0.7">
+                        <line x1="50" y1="10" x2="40" y2="35" class="rain-drop" style="animation-delay:0.1s"/>
+                        <line x1="110" y1="0" x2="100" y2="25" class="rain-drop" style="animation-delay:0.5s"/>
+                        <line x1="175" y1="15" x2="165" y2="40" class="rain-drop" style="animation-delay:0.3s"/>
+                        <line x1="230" y1="5" x2="220" y2="30" class="rain-drop" style="animation-delay:0.8s"/>
+                        <line x1="280" y1="20" x2="270" y2="45" class="rain-drop" style="animation-delay:0.2s"/>
+                    </g>
+                    <!-- Window Mullions (Wooden Crossbars) -->
+                    <path d="M160,0 L160,150 M0,78 L320,78" stroke="#2a1810" stroke-width="6"/>
+                </svg>
+
+                <!-- Window Sill Cozy Props (Espresso / Lamp) -->
+                <div class="absolute bottom-1.5 left-3 right-3 flex items-end justify-between pointer-events-none">
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-black/50 text-amber-100 backdrop-blur-xs" id="weather-caption">Gentle Morning Breeze</span>
+                    <!-- Unlockable Espresso Cup on Window Sill -->
+                    <div id="prop-espresso" class="hidden pointer-events-auto cursor-pointer group" title="Take a warm sip (+5 Cozy Tokens)">
+                        <svg width="38" height="42" viewBox="0 0 40 44">
+                            <path d="M14,12 Q12,6 16,2" fill="none" stroke="#ffffff" stroke-width="1.5" class="steam-wisp"/>
+                            <path d="M22,12 Q24,6 20,2" fill="none" stroke="#ffffff" stroke-width="1.5" class="steam-wisp" style="animation-delay:0.8s"/>
+                            <ellipse cx="18" cy="38" rx="14" ry="3.5" fill="#d6d3d1"/>
+                            <path d="M8,16 L28,16 L25,36 C25,38 11,38 11,36 Z" fill="#b45309" stroke="#78350f" stroke-width="1.5"/>
+                            <path d="M27,20 C33,20 33,30 26,30" fill="none" stroke="#78350f" stroke-width="2.5"/>
+                            <ellipse cx="18" cy="16" rx="10" ry="3" fill="#fef3c7"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Patron Visitor Request Desk Card -->
+            <div class="flex-1 bg-[#f9f3e3] text-[#2b1810] rounded-2xl p-4 border-2 border-[#b08968] shadow-xl flex flex-col justify-between relative overflow-hidden">
+                <div class="flex items-center justify-between border-b border-amber-900/15 pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-900/70">🔔 Inquiry Desk</span>
+                    </div>
+                    <button id="btn-next-patron" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-900/10 hover:bg-amber-900/20 text-amber-950 transition">
+                        New Visitor ➔
+                    </button>
+                </div>
+
+                <!-- Patron Avatar & Speech Bubble -->
+                <div id="patron-container" class="my-3 flex flex-col gap-3">
+                    <!-- Dynamic Patron Rendered Here -->
+                </div>
+
+                <!-- Action to Fulfill Request with Selected Book -->
+                <div class="pt-2 border-t border-amber-900/15 flex flex-col gap-2">
+                    <button id="btn-lend-book" class="w-full py-2.5 px-3 rounded-xl font-semibold text-xs bg-emerald-800 hover:bg-emerald-700 text-amber-50 shadow-md transition flex items-center justify-center gap-2 disabled:opacity-45 disabled:pointer-events-none">
+                        <span>🤲</span>
+                        <span id="lend-btn-label">Select a Book to Recommend</span>
+                    </button>
+                    <div class="flex items-center justify-between text-[11px] text-amber-900/70">
+                        <span>Patrons Helped Today: <strong id="patrons-helped-count">0</strong></span>
+                        <button id="btn-next-day" class="font-bold text-amber-800 hover:underline">Ring Closing Bell 🔔</button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER COLUMN: The Grand 3-Tier Wooden Bookcase & Return Cart -->
+        <section class="flex-1 flex flex-col gap-3 overflow-hidden order-1 lg:order-2">
+            
+            <!-- Grand Wooden Bookcase -->
+            <div class="flex-1 bookcase-frame rounded-2xl p-3 sm:p-4 flex flex-col justify-between relative overflow-visible">
+                
+                <!-- Top Crown Molding & Unlockable Sanctuary Companions (Sleeping Cat / Plants / Fairy Lights) -->
+                <div class="flex items-center justify-between px-3 pb-2 border-b border-amber-500/20 relative">
+                    <div class="flex items-center gap-2">
+                        <!-- Trailing Pothos Vine Prop (Unlockable) -->
+                        <div id="prop-pothos" class="hidden relative">
+                            <svg width="65" height="32" viewBox="0 0 70 36" class="overflow-visible">
+                                <rect x="8" y="2" width="24" height="16" rx="3" fill="#b45309"/>
+                                <path d="M12,18 Q4,35 10,55 Q16,75 8,90" fill="none" stroke="#15803d" stroke-width="2.5"/>
+                                <path d="M24,18 Q34,38 28,62" fill="none" stroke="#166534" stroke-width="2"/>
+                                <ellipse cx="6" cy="32" rx="7" ry="4.5" transform="rotate(-20 6 32)" fill="#22c55e"/>
+                                <ellipse cx="14" cy="48" rx="7" ry="4.5" transform="rotate(15 14 48)" fill="#16a34a"/>
+                                <ellipse cx="7" cy="68" rx="6.5" ry="4" transform="rotate(-25 7 68)" fill="#4ade80"/>
+                                <ellipse cx="31" cy="36" rx="6.5" ry="4" transform="rotate(25 31 36)" fill="#22c55e"/>
+                            </svg>
+                        </div>
+                        <span class="font-serif-display text-xs sm:text-sm tracking-widest text-amber-200/90 uppercase">Grand Reading Room Stacks</span>
+                    </div>
+
+                    <!-- Auto-Sort Helper & Sleeping Black Cat ("Bastet") -->
+                    <div class="flex items-center gap-3">
+                        <!-- Sleeping Black Cat on Top Ledge -->
+                        <div id="prop-cat" class="hidden cursor-pointer group relative" title="Pet Bastet the Library Cat (Purrrr)">
+                            <svg width="64" height="32" viewBox="0 0 68 34" class="overflow-visible">
+                                <!-- Curled Body -->
+                                <ellipse cx="32" cy="22" rx="18" ry="10" fill="#18181b" stroke="#27272a" stroke-width="1.5"/>
+                                <!-- Head -->
+                                <circle cx="19" cy="18" r="9" fill="#18181b"/>
+                                <!-- Ears -->
+                                <polygon points="12,13 14,4 20,11" fill="#18181b"/>
+                                <polygon points="20,11 25,4 26,13" fill="#18181b"/>
+                                <polygon points="13.5,11.5 14.8,6 18.5,10.5" fill="#f43f5e" opacity="0.6"/>
+                                <!-- Closed Sleeping Eyes -->
+                                <path d="M14,18 Q16,20 18,18 M20,18 Q22,20 24,18" fill="none" stroke="#fbbf24" stroke-width="1.4" stroke-linecap="round"/>
+                                <!-- Swaying Tail -->
+                                <path d="M48,24 Q62,24 60,12" fill="none" stroke="#18181b" stroke-width="5" stroke-linecap="round" class="cat-tail"/>
+                            </svg>
+                            <span id="cat-purr-bubble" class="hidden-bubble opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5 left-2 text-[10px] bg-amber-100 text-amber-950 px-2 py-0.5 rounded-full font-bold shadow">Purrrr ♪</span>
+                        </div>
+
+                        <button id="btn-magic-sort" title="Spend 5 Tokens to automatically organize shelves by current Sort Rule" class="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-400/40 transition flex items-center gap-1">
+                            <span>🪄</span>
+                            <span>Tidy Assistance</span>
+                        </button>
+                    </div>
+
+                    <!-- Twinkling Copper Fairy Lights Overlay -->
+                    <div id="prop-fairylights" class="hidden absolute left-4 right-4 -bottom-2.5 flex justify-around pointer-events-none z-20">
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_10px_#fde047] animate-pulse"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-[0_0_10px_#fde047] animate-pulse" style="animation-delay:0.4s"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_10px_#fde047] animate-pulse" style="animation-delay:0.8s"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-[0_0_10px_#fde047] animate-pulse" style="animation-delay:0.2s"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-300 shadow-[0_0_10px_#fde047] animate-pulse" style="animation-delay:0.6s"></span>
+                        <span class="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-[0_0_10px_#fde047] animate-pulse" style="animation-delay:1.0s"></span>
+                    </div>
+                </div>
+
+                <!-- 3 Wooden Shelves Stack -->
+                <div class="flex-1 flex flex-col justify-around gap-2 py-1 overflow-y-auto">
+                    
+                    <!-- SHELF I: High Fantasy & Realms -->
+                    <div class="flex flex-col">
+                        <div class="shelf-recess h-28 sm:h-32 rounded-t-xl px-4 pt-3 flex items-end gap-1.5 overflow-x-auto relative" data-shelf-id="shelf-1" id="shelf-1">
+                            <!-- Books Rendered Dynamically -->
+                        </div>
+                        <div class="shelf-plank h-5 rounded-b-md flex items-center justify-between px-4">
+                            <span class="brass-plaque px-2.5 py-0.5 rounded text-[10px] font-serif-display font-bold tracking-wider uppercase">Shelf I • Myth, Fantasy & Starlore (100–199)</span>
+                            <button data-place-shelf="shelf-1" class="place-here-btn hidden text-[10px] font-bold bg-amber-400 text-stone-950 px-2 py-0.5 rounded shadow animate-pulse">Place Selected Book Here ⤵</button>
+                        </div>
+                    </div>
+
+                    <!-- SHELF II: Botanical & Natural Lore -->
+                    <div class="flex flex-col">
+                        <div class="shelf-recess h-28 sm:h-32 rounded-t-xl px-4 pt-3 flex items-end gap-1.5 overflow-x-auto relative" data-shelf-id="shelf-2" id="shelf-2">
+                            <!-- Books Rendered Dynamically -->
+                        </div>
+                        <div class="shelf-plank h-5 rounded-b-md flex items-center justify-between px-4">
+                            <span class="brass-plaque px-2.5 py-0.5 rounded text-[10px] font-serif-display font-bold tracking-wider uppercase">Shelf II •Herbology & Natural History (200–299)</span>
+                            <button data-place-shelf="shelf-2" class="place-here-btn hidden text-[10px] font-bold bg-amber-400 text-stone-950 px-2 py-0.5 rounded shadow animate-pulse">Place Selected Book Here ⤵</button>
+                        </div>
+                    </div>
+
+                    <!-- SHELF III: Arcane History & Hearth Arts -->
+                    <div class="flex flex-col">
+                        <div class="shelf-recess h-28 sm:h-32 rounded-t-xl px-4 pt-3 flex items-end gap-1.5 overflow-x-auto relative" data-shelf-id="shelf-3" id="shelf-3">
+                            <!-- Books Rendered Dynamically -->
+                        </div>
+                        <div class="shelf-plank h-5 rounded-b-md flex items-center justify-between px-4">
+                            <span class="brass-plaque px-2.5 py-0.5 rounded text-[10px] font-serif-display font-bold tracking-wider uppercase">Shelf III • Antiquities, Gastronomy & Alchemy (300–399)</span>
+                            <button data-place-shelf="shelf-3" class="place-here-btn hidden text-[10px] font-bold bg-amber-400 text-stone-950 px-2 py-0.5 rounded shadow animate-pulse">Place Selected Book Here ⤵</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- BOTTOM RETURN CART: Unsorted Arrivals & Sleeping Dog Companion -->
+            <div class="h-36 bg-[#2c190f] rounded-2xl p-3 border-2 border-[#6c4223] shadow-xl flex flex-col justify-between shrink-0 relative">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-amber-200 flex items-center gap-1.5">
+                            <span>🛒</span>
+                            <span>Brass Return Cart & New Acquisitions</span>
+                        </span>
+                        <span id="cart-badge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-900/90 text-amber-200">3 unsorted</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button data-place-shelf="cart" class="place-here-btn hidden text-[10px] font-bold bg-amber-400 text-stone-950 px-2.5 py-0.5 rounded shadow">Move to Cart ⤵</button>
+                        <button id="btn-receive-returns" class="text-xs font-semibold px-3 py-1 rounded-xl bg-amber-700 hover:bg-amber-600 text-amber-50 transition shadow flex items-center gap-1">
+                            <span>📦</span>
+                            <span>Unpack Book Box (+3)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cart Books Row + Unlockable Bernese Mountain Dog -->
+                <div class="flex items-end justify-between flex-1 pt-2 overflow-hidden">
+                    <div id="cart-shelf" data-shelf-id="cart" class="flex items-end gap-2 h-full flex-1 overflow-x-auto px-2 pb-1">
+                        <!-- Unsorted Books Rendered Here -->
+                    </div>
+
+                    <!-- Unlockable Sleeping Mountain Dog Companion -->
+                    <div id="prop-dog" class="hidden shrink-0 pl-3 cursor-pointer group" title="Pat Barnaby the Gentle Library Hound">
+                        <svg width="78" height="46" viewBox="0 0 84 48">
+                            <!-- Fluffy Sleeping Body -->
+                            <ellipse cx="44" cy="34" rx="28" ry="12" fill="#27272a"/>
+                            <!-- White Chest Blaze & Tan Paws -->
+                            <ellipse cx="26" cy="36" rx="12" ry="8" fill="#f8fafc"/>
+                            <ellipse cx="16" cy="40" rx="6" ry="4" fill="#d97706"/>
+                            <ellipse cx="34" cy="42" rx="6" ry="4" fill="#d97706"/>
+                            <!-- Head Resting on Paws -->
+                            <ellipse cx="22" cy="28" rx="13" ry="10" fill="#18181b"/>
+                            <path d="M20,18 L24,28 L19,28 Z" fill="#f8fafc"/>
+                            <!-- Tan Eyebrows -->
+                            <circle cx="17" cy="24" r="2" fill="#d97706"/>
+                            <circle cx="25" cy="24" r="2" fill="#d97706"/>
+                            <!-- Floppy Ear -->
+                            <ellipse cx="31" cy="29" rx="5" ry="9" fill="#09090b"/>
+                            <!-- Snout -->
+                            <ellipse cx="11" cy="31" rx="6" ry="4.5" fill="#f8fafc"/>
+                            <circle cx="7" cy="30" r="2.5" fill="#09090b"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN: Book Inspection, Restoration Bench & Ex-Libris Stamper -->
+        <aside class="w-full lg:w-80 xl:w-88 bg-[#25150d]/95 text-amber-50 rounded-2xl p-4 border-2 border-[#5c3820] shadow-xl flex flex-col justify-between shrink-0 order-3 overflow-y-auto">
+            <div>
+                <div class="flex items-center justify-between border-b border-amber-700/30 pb-2.5">
+                    <h2 class="font-serif-display font-bold text-sm tracking-wider text-amber-200 uppercase">🔍 Curator's Restoration Bench</h2>
+                    <span class="text-[11px] text-amber-300/70 font-mono" id="selected-call-badge">No Selection</span>
+                </div>
+
+                <!-- Selected Book Open Parchment Display -->
+                <div id="inspector-empty" class="py-12 text-center space-y-2 text-amber-200/60">
+                    <div class="text-4xl">🕯️</div>
+                    <p class="text-xs font-serif-book italic px-4">Click any volume on the shelves or return cart to inspect its synopsis, brush off dust, mend its binding, or stamp its bookplate.</p>
+                </div>
+
+                <div id="inspector-content" class="hidden mt-3 space-y-3">
+                    <!-- Open Book / Cover Card -->
+                    <div class="bg-[#f9f3e3] text-[#2b1810] rounded-xl p-3.5 border-2 border-[#c8a97e] shadow-inner relative overflow-hidden">
+                        <!-- Official Ex Libris Stamp Seal Badge -->
+                        <div id="stamp-seal-badge" class="hidden absolute top-2.5 right-2.5 border-2 border-rose-800/80 text-rose-900 px-2 py-0.5 rounded rotate-[-8deg] font-serif-display font-bold text-[9px] uppercase tracking-widest bg-rose-100/60">
+                            ★ Ex Libris • Quiet Archive ★
+                        </div>
+
+                        <div class="flex items-start gap-3">
+                            <!-- Mini Spine Preview Swatch -->
+                            <div id="inspect-swatch" class="w-8 h-24 rounded border border-amber-900/40 shrink-0 shadow-md flex items-center justify-center text-amber-100 font-serif-display text-xs">
+                                ✦
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <span id="inspect-genre" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-900/15 text-amber-900">Fantasy</span>
+                                <h3 id="inspect-title" class="font-serif-book font-bold text-base leading-snug mt-1 text-stone-900">The Whispering Astrolabe</h3>
+                                <p id="inspect-author" class="text-xs text-stone-600 italic font-serif-book">by Elowen Vance</p>
+                                <p id="inspect-meta" class="text-[10px] font-mono text-stone-500 mt-1">Height: Tall • Shelf I</p>
+                            </div>
+                        </div>
+
+                        <p id="inspect-synopsis" class="text-xs font-serif-book leading-relaxed text-stone-700 mt-3 pt-2.5 border-t border-amber-900/15 italic">
+                            "An illustrated treatise on celestial clockwork and the forgotten constellations of the Northern Reach."
+                        </p>
+                    </div>
+
+                    <!-- Restoration & Care Actions -->
+                    <div class="space-y-2">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-amber-300/80">Book Care & Cataloging</div>
+                        
+                        <div class="grid grid-cols-3 gap-2">
+                            <!-- Dust Brush Button -->
+                            <button id="btn-care-dust" class="p-2.5 rounded-xl bg-[#382014] hover:bg-[#4c2c1c] border border-amber-600/40 flex flex-col items-center gap-1 transition active:scale-95">
+                                <span class="text-lg">🪶</span>
+                                <span class="text-[11px] font-semibold">Brush Dust</span>
+                                <span id="status-dust" class="text-[10px] text-amber-300">Needs Care</span>
+                            </button>
+
+                            <!-- Spine Glue Button -->
+                            <button id="btn-care-repair" class="p-2.5 rounded-xl bg-[#382014] hover:bg-[#4c2c1c] border border-amber-600/40 flex flex-col items-center gap-1 transition active:scale-95">
+                                <span class="text-lg">🧵</span>
+                                <span class="text-[11px] font-semibold">Bind Spine</span>
+                                <span id="status-repair" class="text-[10px] text-amber-300">Worn</span>
+                            </button>
+
+                            <!-- Ex Libris Ink Stamp Button -->
+                            <button id="btn-care-stamp" class="p-2.5 rounded-xl bg-[#382014] hover:bg-[#4c2c1c] border border-amber-600/40 flex flex-col items-center gap-1 transition active:scale-95">
+                                <span class="text-lg">💮</span>
+                                <span class="text-[11px] font-semibold">Ink Stamp</span>
+                                <span id="status-stamp" class="text-[10px] text-amber-300">Unstamped</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Fine Position Ordering On Current Shelf -->
+                    <div class="p-3 rounded-xl bg-[#1a0e08] border border-amber-800/40 space-y-2">
+                        <div class="text-[11px] font-bold uppercase tracking-wider text-amber-300/80">Shelf Placement & Order</div>
+                        <div class="flex items-center gap-1.5">
+                            <button id="btn-shift-left" class="flex-1 py-1.5 px-2 rounded-lg bg-[#331d12] hover:bg-[#47291a] text-xs font-semibold border border-amber-700/30 transition">
+                                ◀ Shift Left
+                            </button>
+                            <button id="btn-shift-right" class="flex-1 py-1.5 px-2 rounded-lg bg-[#331d12] hover:bg-[#47291a] text-xs font-semibold border border-amber-700/30 transition">
+                                Shift Right ▶
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5 pt-1">
+                            <button data-quick-move="shelf-1" class="quick-shelf-btn py-1.5 rounded-lg bg-amber-900/40 hover:bg-amber-700/60 text-[11px] font-semibold border border-amber-600/30 transition">To Shelf I</button>
+                            <button data-quick-move="shelf-2" class="quick-shelf-btn py-1.5 rounded-lg bg-amber-900/40 hover:bg-amber-700/60 text-[11px] font-semibold border border-amber-600/30 transition">To Shelf II</button>
+                            <button data-quick-move="shelf-3" class="quick-shelf-btn py-1.5 rounded-lg bg-amber-900/40 hover:bg-amber-700/60 text-[11px] font-semibold border border-amber-600/30 transition">To Shelf III</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cozy Archive Journal Log (Bottom of Right Panel) -->
+            <div class="mt-4 pt-3 border-t border-amber-700/30">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400/70 mb-1.5">📜 Librarian's Chronicle</div>
+                <div id="journal-feed" class="space-y-1.5 max-h-28 overflow-y-auto text-[11px] font-serif-book text-amber-100/90 pr-1">
+                    <!-- Dynamic log messages -->
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- SANCTUARY DECOR SHOP MODAL -->
+    <div id="shop-modal" class="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-[#f9f3e3] text-[#2b1810] rounded-3xl max-w-lg w-full p-6 border-4 border-[#4a2c18] shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-amber-900/20 pb-3">
+                <div>
+                    <h3 class="font-serif-display font-bold text-xl text-amber-950">Sanctuary Curiosities & Companions</h3>
+                    <p class="text-xs font-serif-book italic text-amber-900/75">Adorn the Quiet Archive with warm companions and botanical touches</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="px-3 py-1 rounded-full bg-amber-900 text-amber-100 font-mono text-xs font-bold">🪙 <span id="shop-tokens-display">45</span></span>
+                    <button id="btn-close-shop" class="w-8 h-8 rounded-xl bg-amber-900/10 hover:bg-amber-900/20 font-bold">✕</button>
+                </div>
+            </div>
+
+            <div id="shop-items-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /*************************************************************************
+         * 1. RICH LIBRARY VOLUME DATABASE (Call Numbers, Colors, Heights, Lore)
+         *************************************************************************/
+        const BOOK_TEMPLATES = [
+            // SHELF I: Myth, Fantasy & Starlore (100-199)
+            {
+                callNumber: 'FAN-102',
+                numCode: 102,
+                shelfTarget: 'shelf-1',
+                genre: 'fantasy',
+                genreLabel: 'Myth & Starlore',
+                title: 'The Whispering Astrolabe',
+                author: 'Elowen Vance',
+                colorHex: '#7f1d1d', // Crimson
+                hueOrder: 1,
+                heightPx: 104,
+                widthPx: 32,
+                synopsis: 'An illustrated treatise on celestial clockwork and the star-navigators of the Northern Reach.',
+                tags: ['fantasy', 'stars', 'clockwork', 'magic']
+            },
+            {
+                callNumber: 'FAN-118',
+                numCode: 118,
+                shelfTarget: 'shelf-1',
+                genre: 'fantasy',
+                genreLabel: 'Myth & Starlore',
+                title: 'Dragons of the Amber Peak',
+                author: 'Sir Cedric Thorne',
+                colorHex: '#9a3412', // Burnt Sienna
+                hueOrder: 2,
+                heightPx: 112,
+                widthPx: 36,
+                synopsis: 'Field sketches and fireside legends of gentle copper wyrms that roost in high alpine libraries.',
+                tags: ['fantasy', 'dragons', 'knights', 'adventure']
+            },
+            {
+                callNumber: 'FAN-145',
+                numCode: 145,
+                shelfTarget: 'shelf-1',
+                genre: 'fantasy',
+                genreLabel: 'Myth & Starlore',
+                title: 'Ballads of the Glass Citadel',
+                author: 'Lyra Pendelton',
+                colorHex: '#4c1d95', // Royal Violet
+                hueOrder: 7,
+                heightPx: 94,
+                widthPx: 28,
+                synopsis: 'Collected courtly poems and chivalric tales from the sunken kingdom of Ys.',
+                tags: ['fantasy', 'knights', 'poetry', 'magic']
+            },
+            {
+                callNumber: 'FAN-176',
+                numCode: 176,
+                shelfTarget: 'shelf-1',
+                genre: 'fantasy',
+                genreLabel: 'Myth & Starlore',
+                title: 'Maps of Uncharted Isles',
+                author: 'Capt. Horatio Finch',
+                colorHex: '#1e3a8a', // Deep Indigo
+                hueOrder: 6,
+                heightPx: 108,
+                widthPx: 34,
+                synopsis: 'Fold-out vellum sea charts detailing floating archipelagos and singing lighthouses.',
+                tags: ['fantasy', 'maps', 'sea', 'adventure']
+            },
+            {
+                callNumber: 'FAN-192',
+                numCode: 192,
+                shelfTarget: 'shelf-1',
+                genre: 'fantasy',
+                genreLabel: 'Myth & Starlore',
+                title: 'The Starlight Bestiary',
+                author: 'Aurelia Sterling',
+                colorHex: '#581c87', // Plum
+                hueOrder: 8,
+                heightPx: 100,
+                widthPx: 31,
+                synopsis: 'Woodcut engravings of nocturnal griffins, moon-moths, and silver foxes.',
+                tags: ['fantasy', 'creatures', 'stars', 'magic']
+            },
+
+            // SHELF II: Herbology & Natural History (200-299)
+            {
+                callNumber: 'BOT-205',
+                numCode: 205,
+                shelfTarget: 'shelf-2',
+                genre: 'botany',
+                genreLabel: 'Botanical Lore',
+                title: 'Compendium of Woodland Ferns',
+                author: 'Beatrix Moss',
+                colorHex: '#14532d', // Forest Green
+                hueOrder: 4,
+                heightPx: 106,
+                widthPx: 33,
+                synopsis: 'Pressed frond specimens and watercolour plates of shade-loving mosses and bracken.',
+                tags: ['botany', 'ferns', 'plants', 'nature']
+            },
+            {
+                callNumber: 'BOT-224',
+                numCode: 224,
+                shelfTarget: 'shelf-2',
+                genre: 'botany',
+                genreLabel: 'Botanical Lore',
+                title: 'Nocturnal Mycology & Spores',
+                author: 'Dr. Sylvanus Root',
+                colorHex: '#065f46', // Emerald Teal
+                hueOrder: 5,
+                heightPx: 92,
+                widthPx: 29,
+                synopsis: 'A pocket guide to bioluminescent forest mushrooms and fairy-ring ecosystems.',
+                tags: ['botany', 'mushrooms', 'fungi', 'nature']
+            },
+            {
+                callNumber: 'BOT-251',
+                numCode: 251,
+                shelfTarget: 'shelf-2',
+                genre: 'botany',
+                genreLabel: 'Botanical Lore',
+                title: 'The Glasshouse Orchidist',
+                author: 'Clara Linnaea',
+                colorHex: '#3f6212', // Olive Moss
+                hueOrder: 4,
+                heightPx: 110,
+                widthPx: 34,
+                synopsis: 'Instructions on misting Victorian wardian cases and nurturing rare cloud-forest blooms.',
+                tags: ['botany', 'flowers', 'plants', 'nature']
+            },
+            {
+                callNumber: 'BOT-278',
+                numCode: 278,
+                shelfTarget: 'shelf-2',
+                genre: 'botany',
+                genreLabel: 'Botanical Lore',
+                title: 'Meadow Apothecary & Teas',
+                author: 'Martha Hawthorne',
+                colorHex: '#a16207', // Golden Ochre
+                hueOrder: 3,
+                heightPx: 96,
+                widthPx: 30,
+                synopsis: 'Soothing chamomile, lavender, and wild rosehip infusions for rainy reading afternoons.',
+                tags: ['botany', 'herbs', 'tea', 'cozy']
+            },
+            {
+                callNumber: 'BOT-295',
+                numCode: 295,
+                shelfTarget: 'shelf-2',
+                genre: 'botany',
+                genreLabel: 'Botanical Lore',
+                title: 'Songbirds of the Hedgerow',
+                author: 'gilbert Wren',
+                colorHex: '#115e59', // Deep Pine
+                hueOrder: 5,
+                heightPx: 102,
+                widthPx: 30,
+                synopsis: 'Musical notation of dawn robin calls and sketches of mossy woodland nests.',
+                tags: ['botany', 'birds', 'nature', 'cozy']
+            },
+
+            // SHELF III: Antiquities, Gastronomy & Alchemy (300-399)
+            {
+                callNumber: 'HIS-310',
+                numCode: 310,
+                shelfTarget: 'shelf-3',
+                genre: 'history',
+                genreLabel: 'Hearth & History',
+                title: 'Autumn Hearth & Brioche',
+                author: 'Henriette Moreau',
+                colorHex: '#92400e', // Cinnamon Amber
+                hueOrder: 2,
+                heightPx: 105,
+                widthPx: 35,
+                synopsis: '18th-century farmhouse recipes for spiced apple galettes, sourdough loaves, and mulled cider.',
+                tags: ['history', 'cooking', 'baking', 'cozy']
+            },
+            {
+                callNumber: 'HIS-334',
+                numCode: 334,
+                shelfTarget: 'shelf-3',
+                genre: 'history',
+                genreLabel: 'Hearth & History',
+                title: 'Treatise on Venetian Glass',
+                author: 'Lorenzo Bellini',
+                colorHex: '#881337', // Burgundy Rose
+                hueOrder: 1,
+                heightPx: 112,
+                widthPx: 33,
+                synopsis: 'A historical account of Murano glassblowers, alchemy flasks, and stained-glass lancets.',
+                tags: ['history', 'craft', 'alchemy', 'antiquity']
+            },
+            {
+                callNumber: 'HIS-358',
+                numCode: 358,
+                shelfTarget: 'shelf-3',
+                genre: 'history',
+                genreLabel: 'Hearth & History',
+                title: 'The Art of Bookbinding',
+                author: 'Arthur Pendelton',
+                colorHex: '#78350f', // Rich Leather
+                hueOrder: 3,
+                heightPx: 98,
+                widthPx: 31,
+                synopsis: 'Traditional methods for marbling endpapers, sewing linen signatures, and gold-leaf tooling.',
+                tags: ['history', 'books', 'craft', 'antiquity']
+            },
+            {
+                callNumber: 'HIS-382',
+                numCode: 382,
+                shelfTarget: 'shelf-3',
+                genre: 'history',
+                genreLabel: 'Hearth & History',
+                title: 'Coffeehouses of Old Vienna',
+                author: 'Franziska Strauss',
+                colorHex: '#1e40af', // Prussian Blue
+                hueOrder: 6,
+                heightPx: 100,
+                widthPx: 29,
+                synopsis: 'Chronicles of velvet-curtained literary cafes, brass espresso machines, and chocolate tortes.',
+                tags: ['history', 'coffee', 'cooking', 'cozy']
+            },
+            {
+                callNumber: 'HIS-396',
+                numCode: 396,
+                shelfTarget: 'shelf-3',
+                genre: 'history',
+                genreLabel: 'Hearth & History',
+                title: 'Letters from a Lighthouse',
+                author: 'Eleanor Finch',
+                colorHex: '#3730a3', // Twilight Indigo
+                hueOrder: 7,
+                heightPx: 94,
+                widthPx: 28,
+                synopsis: 'Warm correspondence between two sister naturalists wintering on a misty Scottish island.',
+                tags: ['history', 'letters', 'sea', 'cozy']
+            }
+        ];
+
+        /*************************************************************************
+         * 2. COZY PATRON VISITORS & DIALOGUE REQUESTS
+         *************************************************************************/
+        const PATRONS = [
+            {
+                id: 'patron-1',
+                name: 'Professor Julian Sterling',
+                role: 'Retired Stargazer',
+                avatarBg: '#fef3c7',
+                svgAvatar: `
+                    <circle cx="28" cy="28" r="26" fill="#fde68a"/>
+                    <circle cx="28" cy="24" r="11" fill="#f5d0c5"/>
+                    <path d="M16,48 C16,36 40,36 40,48" fill="#78350f"/>
+                    <!-- Spectacles & Beard -->
+                    <circle cx="24" cy="23" r="3.5" fill="none" stroke="#92400e" stroke-width="1.5"/>
+                    <circle cx="32" cy="23" r="3.5" fill="none" stroke="#92400e" stroke-width="1.5"/>
+                    <path d="M21,30 Q28,38 35,30" fill="#e5e7eb"/>
+                `,
+                dialogue: '"Good day, Librarian! I am hoping to read something wonder-filled from Shelf I—perhaps a tale of dragons, starlight, or ancient realms."',
+                desiredGenre: 'fantasy',
+                bonusTag: 'dragons',
+                rewardTokens: 15
+            },
+            {
+                id: 'patron-2',
+                name: 'Clementine Willow',
+                role: 'Village Herbalist',
+                avatarBg: '#dcfce7',
+                svgAvatar: `
+                    <circle cx="28" cy="28" r="26" fill="#bbf7d0"/>
+                    <circle cx="28" cy="25" r="11" fill="#fde2d2"/>
+                    <path d="M15,22 Q28,8 41,22" fill="#9a3412"/>
+                    <!-- Straw Hat & Botanical Sprig -->
+                    <ellipse cx="28" cy="15" rx="18" ry="4" fill="#eab308"/>
+                    <path d="M16,48 C16,36 40,36 40,48" fill="#15803d"/>
+                `,
+                dialogue: '"Hello dear! My greenhouse ferns are sprouting and I would love an illustrated botanical or natural history guide from Shelf II."',
+                desiredGenre: 'botany',
+                bonusTag: 'ferns',
+                rewardTokens: 15
+            },
+            {
+                id: 'patron-3',
+                name: 'Master Bramwell',
+                role: 'Hearth Baker & Antiquarian',
+                avatarBg: '#ffedd5',
+                svgAvatar: `
+                    <circle cx="28" cy="28" r="26" fill="#fed7aa"/>
+                    <circle cx="28" cy="25" r="11" fill="#f3c6b6"/>
+                    <path d="M16,48 C16,36 40,36 40,48" fill="#9a3412"/>
+                    <!-- Mustache -->
+                    <path d="M22,28 Q28,25 34,28" fill="none" stroke="#431407" stroke-width="2.5" stroke-linecap="round"/>
+                `,
+                dialogue: '"The rain is coming in! Do you have a comforting volume from Shelf III on historical hearth baking, coffeehouses, or traditional crafts?"',
+                desiredGenre: 'history',
+                bonusTag: 'cooking',
+                rewardTokens: 15
+            },
+            {
+                id: 'patron-4',
+                name: 'Maeve of the Spire',
+                role: 'Apprentice Cartographer',
+                avatarBg: '#e0e7ff',
+                svgAvatar: `
+                    <circle cx="28" cy="28" r="26" fill="#c7d2fe"/>
+                    <circle cx="28" cy="25" r="11" fill="#fce7f3"/>
+                    <path d="M17,16 L28,6 L39,16 Z" fill="#312e81"/>
+                    <path d="M16,48 C16,36 40,36 40,48" fill="#3730a3"/>
+                `,
+                dialogue: '"Greetings! Have you any newly stamped and dusted books on enchanted sea maps, starlore, or mythical creatures?"',
+                desiredGenre: 'fantasy',
+                bonusTag: 'maps',
+                rewardTokens: 18
+            }
+        ];
+
+        /*************************************************************************
+         * 3. SANCTUARY DECOR SHOP ITEMS
+         *************************************************************************/
+        const SHOP_CATALOG = [
+            {
+                id: 'cat',
+                name: 'Bastet the Library Cat',
+                icon: '🐈‍⬛',
+                cost: 20,
+                unlocked: true, // Starts unlocked so player immediately enjoys the cozy cat!
+                desc: 'Naps peacefully atop the grand bookcase and purrs when petted.'
+            },
+            {
+                id: 'espresso',
+                name: 'Steaming Moka Espresso',
+                icon: '☕',
+                cost: 15,
+                unlocked: true,
+                desc: 'Rests on the arched window sill. Click for a warm sip and cozy mood boost!'
+            },
+            {
+                id: 'pothos',
+                name: 'Trailing Golden Pothos',
+                icon: '🌿',
+                cost: 20,
+                unlocked: false,
+                desc: 'Lush cascading botanical vines draped along the upper walnut cornice.'
+            },
+            {
+                id: 'fairylights',
+                name: 'Copper String Lights',
+                icon: '✨',
+                cost: 25,
+                unlocked: false,
+                desc: 'Warm twinkling filament bulbs across the top of the reading stacks.'
+            },
+            {
+                id: 'dog',
+                name: 'Barnaby the Hound',
+                icon: '🐕',
+                cost: 35,
+                unlocked: false,
+                desc: 'A gentle Bernese Mountain Dog who snoozes faithfully beside the return cart.'
+            }
+        ];
+
+        /*************************************************************************
+         * 4. CENTRAL GAME STATE
+         *************************************************************************/
+        const state = {
+            day: 1,
+            timeIndex: 0, // 0: Morning, 1: Golden Hour, 2: Rainy Evening, 3: Midnight
+            sortMode: 'genre', // 'genre' | 'color' | 'height'
+            tokens: 45,
+            renown: 12,
+            patronsHelpedToday: 0,
+            currentPatronIndex: 0,
+            selectedBookId: null,
+            audioEnabled: true,
+            books: [],
+            nextBookUid: 100
+        };
+
+        const TIME_THEMES = [
+            { id: 'morning', name: 'Morning Sun', icon: '☀️', bodyClass: 'theme-morning', skyGrad: 'url(#sky-morning)', caption: 'Crisp Morning Sunlight', celestialColor: '#fde047', rain: false },
+            { id: 'golden', name: 'Golden Hour', icon: '🌅', bodyClass: 'theme-golden', skyGrad: 'url(#sky-golden)', caption: 'Warm Amber Sunset', celestialColor: '#fb923c', rain: false },
+            { id: 'rain', name: 'Rainy Dusk', icon: '🌧️', bodyClass: 'theme-rain', skyGrad: 'url(#sky-rain)', caption: 'Soothing Rain on Glass', celestialColor: '#94a3b8', rain: true },
+            { id: 'midnight', name: 'Candlelight Night', icon: '🌙', bodyClass: 'theme-midnight', skyGrad: 'url(#sky-midnight)', caption: 'Midnight Oil & Stars', celestialColor: '#fef08a', rain: false }
+        ];
+
+        /*************************************************************************
+         * 5. WEB AUDIO API / TONE.JS FOLEY SOUND ENGINE
+         *************************************************************************/
+        const SoundEngine = {
+            ready: false,
+            async init() {
+                if (this.ready || !state.audioEnabled) return;
+                try {
+                    await Tone.start();
+                    this.ready = true;
+                } catch (e) {}
+            },
+            playWoodShelve() {
+                if (!state.audioEnabled) return;
+                try {
+                    this.init();
+                    const synth = new Tone.MembraneSynth({
+                        pitchDecay: 0.03,
+                        octaves: 1.5,
+                        envelope: { attack: 0.002, decay: 0.12, sustain: 0 }
+                    }).toDestination();
+                    synth.volume.value = -12;
+                    synth.triggerAttackRelease("D2", "16n");
+                } catch (e) {}
+            },
+            playBrushDust() {
+                if (!state.audioEnabled) return;
+                try {
+                    this.init();
+                    const noise = new Tone.NoiseSynth({
+                        noise: { type: 'pink' },
+                        envelope: { attack: 0.02, decay: 0.18, sustain: 0 }
+                    }).toDestination();
+                    noise.volume.value = -16;
+                    noise.triggerAttackRelease("16n");
+                } catch (e) {}
+            },
+            playStampClick() {
+                if (!state.audioEnabled) return;
+                try {
+                    this.init();
+                    const synth = new Tone.MembraneSynth({
+                        pitchDecay: 0.01,
+                        octaves: 3,
+                        envelope: { attack: 0.001, decay: 0.08, sustain: 0 }
+                    }).toDestination();
+                    synth.volume.value = -10;
+                    synth.triggerAttackRelease("A3", "32n");
+                } catch (e) {}
+            },
+            playWarmChime() {
+                if (!state.audioEnabled) return;
+                try {
+                    this.init();
+                    const poly = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: 'sine' },
+                        envelope: { attack: 0.01, decay: 0.5, sustain: 0.1, release: 0.8 }
+                    }).toDestination();
+                    poly.volume.value = -15;
+                    poly.triggerAttackRelease(["C5", "E5", "G5", "B5"], "16n");
+                } catch (e) {}
+            }
+        };
+
+        /*************************************************************************
+         * 6. INITIALIZATION & BOOK INSTANTIATION
+         *************************************************************************/
+        function initLibraryBooks() {
+            // Create initial set of 12 books across the 3 shelves + 3 unsorted in the return cart
+            const initialTemplates = [...BOOK_TEMPLATES];
+            state.books = initialTemplates.map((tpl, index) => {
+                // Put the last 3 books in the Return Cart slightly dusty/unstamped for immediate gameplay!
+                const inCart = index >= 12;
+                // Slightly scramble a couple of shelf books so player can enjoy tidying right away
+                let location = tpl.shelfTarget;
+                if (inCart) {
+                    location = 'cart';
+                } else if (index === 1) {
+                    location = 'shelf-2'; // Misplaced fantasy book on shelf 2
+                } else if (index === 6) {
+                    location = 'shelf-1'; // Misplaced botany book on shelf 1
+                }
+
+                return {
+                    ...tpl,
+                    id: 'book-' + (++state.nextBookUid),
+                    location: location,
+                    dusty: inCart || index % 4 === 0,
+                    damaged: inCart && index % 2 === 1,
+                    stamped: !inCart && index % 3 !== 0
+                };
+            });
+        }
+
+        function logJournal(message) {
+            const feed = document.getElementById('journal-feed');
+            const entry = document.createElement('div');
+            entry.className = 'leading-snug py-0.5 border-b border-amber-700/15';
+            entry.innerHTML = `<span class="text-amber-400">✦</span> ${message}`;
+            feed.prepend(entry);
+        }
+
+        /*************************************************************************
+         * 7. SHELF HARMONY & ARCHIVE ORDER SCORING ENGINE
+         *************************************************************************/
+        function calculateHarmony() {
+            const shelfIds = ['shelf-1', 'shelf-2', 'shelf-3'];
+            let totalChecks = 0;
+            let passedChecks = 0;
+
+            shelfIds.forEach(sId => {
+                const shelfBooks = state.books.filter(b => b.location === sId);
+                shelfBooks.forEach((book, idx) => {
+                    // Care state check
+                    totalChecks += 2;
+                    if (!book.dusty && !book.damaged) passedChecks += 1;
+                    if (book.stamped) passedChecks += 1;
+
+                    // Sorting rule check
+                    totalChecks += 2;
+                    if (state.sortMode === 'genre') {
+                        if (book.shelfTarget === sId) passedChecks += 1;
+                        if (idx === 0 || shelfBooks[idx - 1].numCode <= book.numCode) passedChecks += 1;
+                    } else if (state.sortMode === 'color') {
+                        if (idx === 0 || shelfBooks[idx - 1].hueOrder <= book.hueOrder) passedChecks += 2;
+                    } else if (state.sortMode === 'height') {
+                        if (idx === 0 || shelfBooks[idx - 1].heightPx >= book.heightPx) passedChecks += 2;
+                    }
+                });
+            });
+
+            if (totalChecks === 0) return 50;
+            const pct = Math.min(100, Math.max(15, Math.round((passedChecks / totalChecks) * 100)));
+
+            document.getElementById('harmony-bar').style.width = `${pct}%`;
+            document.getElementById('harmony-score-text').textContent = `${pct}%`;
+
+            // Update Librarian Rank Title based on Renown
+            const rankEl = document.getElementById('librarian-rank-label');
+            if (state.renown >= 50) rankEl.textContent = 'Grand Archivist of the Golden Folio';
+            else if (state.renown >= 28) rankEl.textContent = 'Master Keeper of Rare Lore';
+            else if (state.renown >= 18) rankEl.textContent = 'Senior Botanical & Myth Curator';
+
+            return pct;
+        }
+
+        /*************************************************************************
+         * 8. RENDER SHELVES, SPINES & INSPECTOR
+         *************************************************************************/
+        function renderBookSpineHTML(book) {
+            const isSelected = book.id === state.selectedBookId;
+            const wearBadges = [];
+            if (book.dusty) wearBadges.push('🪶');
+            if (book.damaged) wearBadges.push('🧵');
+            if (!book.stamped) wearBadges.push('💮');
+
+            return `
+                <div draggable="true"
+                     data-book-id="${book.id}"
+                     style="height: ${book.heightPx}px; width: ${book.widthPx}px; background-color: ${book.colorHex};"
+                     class="book-spine ${isSelected ? 'selected-book' : ''} flex flex-col items-center justify-between py-1.5 px-0.5 select-none group">
+                    
+                    <!-- Top Gold Foil Ribbons -->
+                    <div class="w-full flex flex-col gap-0.5 px-0.5">
+                        <div class="w-full h-[2px] bg-amber-300/75"></div>
+                        <div class="w-full h-[1px] bg-amber-200/50"></div>
+                    </div>
+
+                    <!-- Vertical Spine Title -->
+                    <div class="vertical-title font-serif-book text-[10px] font-semibold tracking-wide text-amber-100/95 truncate max-h-[62%] leading-none">
+                        ${book.title}
+                    </div>
+
+                    <!-- Bottom Call Number Tag -->
+                    <div class="w-full flex flex-col items-center gap-0.5">
+                        <span class="text-[7px] font-mono bg-amber-100/90 text-stone-900 px-1 rounded-xs font-bold leading-tight">
+                            ${book.callNumber.split('-')[1]}
+                        </span>
+                        <div class="w-full h-[2px] bg-amber-300/75"></div>
+                    </div>
+
+                    <!-- Dusty Visual Texture Overlay -->
+                    ${book.dusty ? `<div class="absolute inset-0 dust-overlay pointer-events-none rounded-xs"></div>` : ''}
+
+                    <!-- Tiny Care Needed Dot -->
+                    ${wearBadges.length > 0 ? `
+                        <span class="absolute -top-1.5 -right-1 w-3.5 h-3.5 rounded-full bg-amber-400 text-stone-950 text-[8px] font-bold flex items-center justify-center shadow">
+                            !
+                        </span>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function renderAllShelves() {
+            ['shelf-1', 'shelf-2', 'shelf-3', 'cart'].forEach(locId => {
+                const container = document.getElementById(locId === 'cart' ? 'cart-shelf' : locId);
+                const booksHere = state.books.filter(b => b.location === locId);
+                container.innerHTML = booksHere.map(b => renderBookSpineHTML(b)).join('');
+            });
+
+            // Update Return Cart count badge
+            const cartCount = state.books.filter(b => b.location === 'cart').length;
+            document.getElementById('cart-badge').textContent = `${cartCount} unsorted`;
+
+            // Show/Hide "Place Selected Book Here" helper buttons on shelves
+            document.querySelectorAll('.place-here-btn').forEach(btn => {
+                if (state.selectedBookId) {
+                    btn.classList.remove('hidden');
+                } else {
+                    btn.classList.add('hidden');
+                }
+            });
+
+            // Bind Click & Drag Events to Rendered Book Spines
+            document.querySelectorAll('.book-spine').forEach(el => {
+                const id = el.dataset.bookId;
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    state.selectedBookId = (state.selectedBookId === id) ? null : id;
+                    SoundEngine.playWoodShelve();
+                    renderAllShelves();
+                    renderInspector();
+                    renderPatronCard();
+                });
+
+                el.addEventListener('dragstart', (e) => {
+                    state.selectedBookId = id;
+                    e.dataTransfer.setData('text/plain', id);
+                });
+            });
+
+            // Update Top Currencies
+            document.getElementById('tokens-count').textContent = state.tokens;
+            document.getElementById('rep-count').textContent = state.renown;
+
+            calculateHarmony();
+        }
+
+        function renderInspector() {
+            const emptyEl = document.getElementById('inspector-empty');
+            const contentEl = document.getElementById('inspector-content');
+            const callBadge = document.getElementById('selected-call-badge');
+
+            const book = state.books.find(b => b.id === state.selectedBookId);
+            if (!book) {
+                emptyEl.classList.remove('hidden');
+                contentEl.classList.add('hidden');
+                callBadge.textContent = 'No Selection';
+                return;
+            }
+
+            emptyEl.classList.add('hidden');
+            contentEl.classList.remove('hidden');
+            callBadge.textContent = book.callNumber;
+
+            document.getElementById('inspect-swatch').style.backgroundColor = book.colorHex;
+            document.getElementById('inspect-genre').textContent = `${book.genreLabel} • ${book.callNumber}`;
+            document.getElementById('inspect-title').textContent = book.title;
+            document.getElementById('inspect-author').textContent = `by ${book.author}`;
+            document.getElementById('inspect-meta').textContent = `Spine: ${book.heightPx}mm • Currently on ${book.location.toUpperCase()}`;
+            document.getElementById('inspect-synopsis').textContent = `"${book.synopsis}"`;
+
+            // Stamp Seal visibility
+            const seal = document.getElementById('stamp-seal-badge');
+            if (book.stamped) seal.classList.remove('hidden');
+            else seal.classList.add('hidden');
+
+            // Care Status Labels
+            const dustLabel = document.getElementById('status-dust');
+            dustLabel.textContent = book.dusty ? 'Dusty (+3🪙)' : 'Sparkling ✓';
+            dustLabel.className = book.dusty ? 'text-[10px] text-amber-300 font-bold' : 'text-[10px] text-emerald-400';
+
+            const repairLabel = document.getElementById('status-repair');
+            repairLabel.textContent = book.damaged ? 'Loose (+4🪙)' : 'Sturdy ✓';
+            repairLabel.className = book.damaged ? 'text-[10px] text-amber-300 font-bold' : 'text-[10px] text-emerald-400';
+
+            const stampLabel = document.getElementById('status-stamp');
+            stampLabel.textContent = !book.stamped ? 'Unstamped (+3🪙)' : 'Cataloged ✓';
+            stampLabel.className = !book.stamped ? 'text-[10px] text-amber-300 font-bold' : 'text-[10px] text-emerald-400';
+        }
+
+        /*************************************************************************
+         * 9. PATRON VISITORS & BOOK LENDING LOOP
+         *************************************************************************/
+        function renderPatronCard() {
+            const patron = PATRONS[state.currentPatronIndex];
+            const container = document.getElementById('patron-container');
+            const selectedBook = state.books.find(b => b.id === state.selectedBookId);
+
+            container.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-14 h-14 rounded-2xl border-2 border-amber-900/30 flex items-center justify-center shrink-0 shadow-sm overflow-hidden" style="background:${patron.avatarBg}">
+                        <svg width="56" height="56" viewBox="0 0 56 56">${patron.svgAvatar}</svg>
+                    </div>
+                    <div>
+                        <div class="font-serif-book font-bold text-base text-stone-900 leading-tight">${patron.name}</div>
+                        <div class="text-xs text-amber-900/75 font-medium">${patron.role}</div>
+                        <span class="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-900/15 text-amber-950">
+                            Seeks: ${patron.desiredGenre.toUpperCase()}
+                        </span>
+                    </div>
+                </div>
+                <p class="text-xs font-serif-book italic bg-white/70 p-3 rounded-xl border border-amber-900/15 text-stone-800 leading-relaxed">
+                    ${patron.dialogue}
+                </p>
+            `;
+
+            const lendBtn = document.getElementById('btn-lend-book');
+            const lendLabel = document.getElementById('lend-btn-label');
+
+            if (!selectedBook) {
+                lendBtn.disabled = true;
+                lendLabel.textContent = 'Select a Book to Recommend';
+            } else {
+                lendBtn.disabled = false;
+                const matchesGenre = selectedBook.genre === patron.desiredGenre;
+                lendLabel.textContent = matchesGenre
+                    ? `Recommend "${selectedBook.title}" (+${patron.rewardTokens}🪙)`
+                    : `Offer "${selectedBook.title}" (Genre Mismatch)`;
+            }
+
+            document.getElementById('patrons-helped-count').textContent = state.patronsHelpedToday;
+        }
+
+        /*************************************************************************
+         * 10. SANCTUARY SHOP & UNLOCKABLE COMPANIONS
+         *************************************************************************/
+        function syncSanctuaryProps() {
+            SHOP_CATALOG.forEach(item => {
+                const el = document.getElementById(`prop-${item.id}`);
+                if (el) {
+                    if (item.unlocked) el.classList.remove('hidden');
+                    else el.classList.add('hidden');
+                }
+            });
+        }
+
+        function renderShopModal() {
+            document.getElementById('shop-tokens-display').textContent = state.tokens;
+            const grid = document.getElementById('shop-items-grid');
+
+            grid.innerHTML = SHOP_CATALOG.map(item => `
+                <div class="p-3.5 rounded-2xl bg-white/80 border-2 ${item.unlocked ? 'border-emerald-700/40' : 'border-amber-900/20'} flex flex-col justify-between gap-2 shadow-sm">
+                    <div class="flex items-start gap-2.5">
+                        <span class="text-2xl">${item.icon}</span>
+                        <div>
+                            <div class="font-serif-book font-bold text-sm text-stone-900">${item.name}</div>
+                            <p class="text-[11px] text-stone-600 leading-snug mt-0.5">${item.desc}</p>
+                        </div>
+                    </div>
+                    <button data-buy-id="${item.id}" ${item.unlocked ? 'disabled' : ''}
+                            class="shop-buy-btn w-full py-1.5 rounded-xl text-xs font-bold transition ${
+                                item.unlocked
+                                ? 'bg-emerald-100 text-emerald-900 cursor-default'
+                                : 'bg-amber-800 hover:bg-amber-700 text-amber-50 shadow'
+                            }">
+                        ${item.unlocked ? '✓ Installed in Archive' : `Acquire for 🪙 ${item.cost} Tokens`}
+                    </button>
+                </div>
+            `).join('');
+
+            grid.querySelectorAll('.shop-buy-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const item = SHOP_CATALOG.find(i => i.id === btn.dataset.buyId);
+                    if (!item || item.unlocked) return;
+                    if (state.tokens < item.cost) {
+                        logJournal(`Need ${item.cost} Tokens to welcome ${item.name}. Keep restoring & shelving books!`);
+                        return;
+                    }
+                    state.tokens -= item.cost;
+                    state.renown += 5;
+                    item.unlocked = true;
+                    SoundEngine.playWarmChime();
+                    logJournal(`Purchased ${item.name} for the library sanctuary!`);
+                    syncSanctuaryProps();
+                    renderShopModal();
+                    renderAllShelves();
+                });
+            });
+        }
+
+        /*************************************************************************
+         * 11. AMBIENT LIGHTING, WEATHER & SUNBEAM DUST MOTES
+         *************************************************************************/
+        function generateDustMotes() {
+            const container = document.getElementById('motes-container');
+            let html = '';
+            for (let i = 0; i < 18; i++) {
+                const left = 5 + Math.floor(Math.random() * 65);
+                const top = 8 + Math.floor(Math.random() * 75);
+                const size = 3 + (i % 4);
+                const delay = (i * 0.4).toFixed(1);
+                html += `<div class="mote absolute rounded-full bg-amber-100/60 pointer-events-none"
+                              style="left:${left}%; top:${top}%; width:${size}px; height:${size}px; animation-delay:${delay}s"></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function applyTimeTheme() {
+            const theme = TIME_THEMES[state.timeIndex];
+            const body = document.getElementById('app-body');
+            TIME_THEMES.forEach(t => body.classList.remove(t.bodyClass));
+            body.classList.add(theme.bodyClass);
+
+            document.getElementById('day-badge').textContent = `Day ${state.day} • ${theme.name}`;
+            document.getElementById('time-icon').textContent = theme.icon;
+            document.getElementById('window-sky-rect').setAttribute('fill', theme.skyGrad);
+            document.getElementById('window-celestial').setAttribute('fill', theme.celestialColor);
+            document.getElementById('weather-caption').textContent = theme.caption;
+
+            const rainLayer = document.getElementById('window-rain-layer');
+            if (theme.rain) rainLayer.classList.remove('hidden');
+            else rainLayer.classList.add('hidden');
+        }
+
+        /*************************************************************************
+         * 12. EVENT LISTENERS & INTERACTION BINDINGS
+         *************************************************************************/
+        function setupEventListeners() {
+            // Drag and Drop onto any Shelf or Return Cart
+            ['shelf-1', 'shelf-2', 'shelf-3', 'cart-shelf'].forEach(containerId => {
+                const el = document.getElementById(containerId);
+                el.addEventListener('dragover', (e) => e.preventDefault());
+                el.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const bookId = e.dataTransfer.getData('text/plain') || state.selectedBookId;
+                    const targetShelf = el.dataset.shelfId;
+                    moveBookToShelf(bookId, targetShelf);
+                });
+            });
+
+            // Click "Place Selected Book Here" on shelf plank
+            document.querySelectorAll('.place-here-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!state.selectedBookId) return;
+                    moveBookToShelf(state.selectedBookId, btn.dataset.placeShelf);
+                });
+            });
+
+            // Quick Shelf Move Buttons in Inspector
+            document.querySelectorAll('.quick-shelf-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (!state.selectedBookId) return;
+                    moveBookToShelf(state.selectedBookId, btn.dataset.quickMove);
+                });
+            });
+
+            // Shift Book Left / Right within its current shelf
+            document.getElementById('btn-shift-left').addEventListener('click', () => shiftSelectedBook(-1));
+            document.getElementById('btn-shift-right').addEventListener('click', () => shiftSelectedBook(1));
+
+            // Restoration Care Actions
+            document.getElementById('btn-care-dust').addEventListener('click', () => {
+                const book = state.books.find(b => b.id === state.selectedBookId);
+                if (!book || !book.dusty) return;
+                book.dusty = false;
+                state.tokens += 3;
+                state.renown += 1;
+                SoundEngine.playBrushDust();
+                logJournal(`Brushed velvet dust off "${book.title}" (+3🪙).`);
+                renderAllShelves();
+                renderInspector();
+            });
+
+            document.getElementById('btn-care-repair').addEventListener('click', () => {
+                const book = state.books.find(b => b.id === state.selectedBookId);
+                if (!book || !book.damaged) return;
+                book.damaged = false;
+                state.tokens += 4;
+                state.renown += 2;
+                SoundEngine.playWoodShelve();
+                logJournal(`Restored the linen binding on "${book.title}" (+4🪙).`);
+                renderAllShelves();
+                renderInspector();
+            });
+
+            document.getElementById('btn-care-stamp').addEventListener('click', () => {
+                const book = state.books.find(b => b.id === state.selectedBookId);
+                if (!book || book.stamped) return;
+                book.stamped = true;
+                state.tokens += 3;
+                state.renown += 1;
+                SoundEngine.playStampClick();
+                logJournal(`Stamped Ex Libris seal inside "${book.title}" (+3🪙).`);
+                renderAllShelves();
+                renderInspector();
+            });
+
+            // Sorting Mode Switcher
+            document.querySelectorAll('.sort-mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.sortMode = btn.dataset.sort;
+                    document.querySelectorAll('.sort-mode-btn').forEach(b => {
+                        b.className = 'sort-mode-btn px-2.5 py-1 rounded-lg font-semibold text-amber-200/80 hover:text-white transition';
+                    });
+                    btn.className = 'sort-mode-btn px-2.5 py-1 rounded-lg font-semibold bg-amber-600 text-stone-950 transition';
+                    SoundEngine.playWoodShelve();
+                    calculateHarmony();
+                    logJournal(`Archive sorting rule switched to ${state.sortMode.toUpperCase()}.`);
+                });
+            });
+
+            // Tidy Assistance (Auto-Sort shelves by current rule)
+            document.getElementById('btn-magic-sort').addEventListener('click', () => {
+                if (state.tokens < 5) {
+                    logJournal('Need 5 Tokens for Tidy Assistance.');
+                    return;
+                }
+                state.tokens -= 5;
+                autoOrganizeShelves();
+                SoundEngine.playWarmChime();
+                logJournal(`Magical Tidy organized the shelves by ${state.sortMode.toUpperCase()}!`);
+                renderAllShelves();
+                renderInspector();
+            });
+
+            // Unpack New Book Donations into Return Cart
+            document.getElementById('btn-receive-returns').addEventListener('click', () => {
+                const cartCount = state.books.filter(b => b.location === 'cart').length;
+                if (cartCount >= 8) {
+                    logJournal('The Return Cart is brimming! Shelve a few volumes first.');
+                    return;
+                }
+                for (let i = 0; i < 3; i++) {
+                    const tpl = BOOK_TEMPLATES[Math.floor(Math.random() * BOOK_TEMPLATES.length)];
+                    const newNum = tpl.numCode + Math.floor(Math.random() * 7);
+                    state.books.push({
+                        ...tpl,
+                        id: 'book-' + (++state.nextBookUid),
+                        callNumber: `${tpl.callNumber.split('-')[0]}-${newNum}`,
+                        numCode: newNum,
+                        location: 'cart',
+                        dusty: true,
+                        damaged: Math.random() > 0.45,
+                        stamped: false
+                    });
+                }
+                SoundEngine.playWoodShelve();
+                logJournal('Unpacked 3 donated volumes onto the Return Cart.');
+                renderAllShelves();
+            });
+
+            // Lend Selected Book to Patron
+            document.getElementById('btn-lend-book').addEventListener('click', () => {
+                const book = state.books.find(b => b.id === state.selectedBookId);
+                if (!book) return;
+                const patron = PATRONS[state.currentPatronIndex];
+
+                let earned = 8;
+                if (book.genre === patron.desiredGenre) earned = patron.rewardTokens;
+                if (!book.dusty && book.stamped) earned += 5; // Care bonus
+
+                state.tokens += earned;
+                state.renown += 3;
+                state.patronsHelpedToday += 1;
+
+                // Remove lent book and advance patron
+                state.books = state.books.filter(b => b.id !== book.id);
+                state.selectedBookId = null;
+                state.currentPatronIndex = (state.currentPatronIndex + 1) % PATRONS.length;
+
+                SoundEngine.playWarmChime();
+                logJournal(`${patron.name} borrowed "${book.title}" (+${earned}🪙, +3⭐).`);
+                renderAllShelves();
+                renderInspector();
+                renderPatronCard();
+            });
+
+            // Next Visitor Button
+            document.getElementById('btn-next-patron').addEventListener('click', () => {
+                state.currentPatronIndex = (state.currentPatronIndex + 1) % PATRONS.length;
+                SoundEngine.playBrushDust();
+                renderPatronCard();
+            });
+
+            // Ring Closing Bell / Advance Day & Time
+            document.getElementById('btn-next-day').addEventListener('click', () => {
+                state.day += 1;
+                state.timeIndex = 0;
+                const harmonyBonus = Math.round(calculateHarmony() / 10);
+                state.tokens += harmonyBonus;
+                SoundEngine.playWarmChime();
+                applyTimeTheme();
+                logJournal(`Day ${state.day} dawns! Earned +${harmonyBonus}🪙 daily Archive Harmony stipend.`);
+                renderAllShelves();
+            });
+
+            // Cycle Time of Day
+            document.getElementById('btn-cycle-time').addEventListener('click', () => {
+                state.timeIndex = (state.timeIndex + 1) % TIME_THEMES.length;
+                applyTimeTheme();
+            });
+
+            // Audio Toggle
+            document.getElementById('btn-audio-toggle').addEventListener('click', () => {
+                state.audioEnabled = !state.audioEnabled;
+                document.getElementById('audio-icon').textContent = state.audioEnabled ? '🔊' : '🔇';
+            });
+
+            // Shop Modal Open / Close
+            const shopModal = document.getElementById('shop-modal');
+            document.getElementById('btn-open-shop').addEventListener('click', () => {
+                renderShopModal();
+                shopModal.classList.remove('hidden');
+                shopModal.classList.add('flex');
+            });
+            document.getElementById('btn-close-shop').addEventListener('click', () => {
+                shopModal.classList.add('hidden');
+                shopModal.classList.remove('flex');
+            });
+
+            // Interactive Cozy Companions (Pet Cat, Sip Espresso, Pat Dog)
+            document.getElementById('prop-cat').addEventListener('click', () => {
+                SoundEngine.playWarmChime();
+                logJournal('Bastet stretches on the top cornice and purrs contentedly.');
+            });
+            document.getElementById('prop-espresso').addEventListener('click', () => {
+                state.tokens += 2;
+                SoundEngine.playStampClick();
+                logJournal('Sipped warm caramel espresso by the arched window (+2🪙).');
+                renderAllShelves();
+            });
+            document.getElementById('prop-dog').addEventListener('click', () => {
+                SoundEngine.playWoodShelve();
+                logJournal('Barnaby thumps his fluffy tail happily beside the return cart.');
+            });
+        }
+
+        function moveBookToShelf(bookId, targetShelfId) {
+            const idx = state.books.findIndex(b => b.id === bookId);
+            if (idx === -1) return;
+            const [book] = state.books.splice(idx, 1);
+            book.location = targetShelfId;
+            state.books.push(book);
+            SoundEngine.playWoodShelve();
+            renderAllShelves();
+            renderInspector();
+        }
+
+        function shiftSelectedBook(direction) {
+            if (!state.selectedBookId) return;
+            const book = state.books.find(b => b.id === state.selectedBookId);
+            if (!book) return;
+
+            const shelfBooks = state.books.filter(b => b.location === book.location);
+            const localIdx = shelfBooks.findIndex(b => b.id === book.id);
+            const targetLocalIdx = localIdx + direction;
+            if (targetLocalIdx < 0 || targetLocalIdx >= shelfBooks.length) return;
+
+            const neighbor = shelfBooks[targetLocalIdx];
+            const globalIdxA = state.books.findIndex(b => b.id === book.id);
+            const globalIdxB = state.books.findIndex(b => b.id === neighbor.id);
+
+            // Swap positions in state.books array
+            const temp = state.books[globalIdxA];
+            state.books[globalIdxA] = state.books[globalIdxB];
+            state.books[globalIdxB] = temp;
+
+            SoundEngine.playWoodShelve();
+            renderAllShelves();
+        }
+
+        function autoOrganizeShelves() {
+            // Move all non-cart books (or cart books too) to their proper shelves and sort them
+            state.books.forEach(b => {
+                if (b.location === 'cart' || state.sortMode === 'genre') {
+                    b.location = b.shelfTarget;
+                }
+            });
+
+            state.books.sort((a, b) => {
+                if (state.sortMode === 'genre') return a.numCode - b.numCode;
+                if (state.sortMode === 'color') return a.hueOrder - b.hueOrder;
+                if (state.sortMode === 'height') return b.heightPx - a.heightPx;
+                return 0;
+            });
+        }
+
+        // Launch The Quiet Archive
+        window.addEventListener('DOMContentLoaded', () => {
+            generateDustMotes();
+            initLibraryBooks();
+            syncSanctuaryProps();
+            setupEventListeners();
+            applyTimeTheme();
+            renderAllShelves();
+            renderInspector();
+            renderPatronCard();
+            logJournal('Welcome to The Quiet Archive! Inspect dusty returns on the cart or tidy the shelves.');
+        });
+    </script>
+</body>
+</html>
